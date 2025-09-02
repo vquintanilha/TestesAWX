@@ -1,0 +1,12 @@
+---
+- name: Criar arquivo de teste
+  hosts: all
+  become: yes
+  tasks:
+    - name: Criar arquivo com conteúdo simples
+      ansible.builtin.copy:
+        dest: /tmp/teste_awx.txt
+        content: "Arquivo criado pelo AWX em {{ ansible_hostname }}\n"
+        owner: "{{ ansible_user | default('root') }}"
+        group: "{{ ansible_user | default('root') }}"
+        mode: '0644'
