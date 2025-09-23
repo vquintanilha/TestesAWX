@@ -1,0 +1,79 @@
+---
+- name: AWX -> check primary and manage backup instance
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    primary_health_url: "http://168.75.97.255/ping"
+    primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
+    backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
+    compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
+
+  tasks:
+    - name: Recriar arquivo da chave OCI a partir de OCI_KEY_CONTENT
+      copy:
+        dest: /tmp/oci_api_key.pem
+        content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
+        mode: '0600'
+
+    - name: Check primary by HTTP (Traefik /ping)
+      ansible.builtin.uri:
+        url: "{{ primary_health_url }}"
+        method: GET
+        return_content: no
+        status_code: 200
+        timeout: 5
+      register: http_check
+      failed_when: false
+
+    - name: Set primary_up from HTTP
+      ansible.builtin.set_fact:
+        primary_up: "{{ (http_check.status == 200) | default(false) }}"
+
+    - name: If HTTP failed - check primary instance in OCI
+      oracle.oci.oci_compute_instance_facts:
+        instance_id: "{{ primary_instance_ocid }}"
+        compartment_id: "{{ compartment_ocid }}"
+      register: primary_facts
+      when: not primary_up
+
+    - name: Set primary_up from OCI facts
+      ansible.builtin.set_fact:
+        primary_up: "{{ (primary_facts.instances[0].lifecycle_state == 'RUNNING') | default(false) }}"
+      when: not primary_up
+
+    - name: Get backup instance facts
+      oracle.oci.oci_compute_instance_facts:
+        instance_id: "{{ backup_instance_ocid }}"
+        compartment_id: "{{ compartment_ocid }}"
+      register: backup_facts
+
+    - name: Decide action: start backup (if primary down && backup not RUNNING)
+      ansible.builtin.debug:
+        msg: "Would START backup instance {{ backup_instance_ocid }} (primary_up={{ primary_up }})"
+      when: not primary_up and backup_facts.instances[0].lifecycle_state != 'RUNNING'
+
+    - name: Start backup instance (OCI)
+      oracle.oci.oci_compute_instance_actions:
+        action: start
+        instance_id: "{{ backup_instance_ocid }}"
+        wait: yes
+      when: not primary_up and backup_facts.instances[0].lifecycle_state != 'RUNNING' and (do_action | default(false)) | bool
+
+    - name: Decide action: stop backup (if primary up && backup RUNNING)
+      ansible.builtin.debug:
+        msg: "Would STOP backup instance {{ backup_instance_ocid }} (primary_up={{ primary_up }})"
+      when: primary_up and backup_facts.instances[0].lifecycle_state == 'RUNNING'
+
+    - name: Stop backup instance (OCI)
+      oracle.oci.oci_compute_instance_actions:
+        action: stop
+        instance_id: "{{ backup_instance_ocid }}"
+        wait: yes
+      when: primary_up and backup_facts.instances[0].lifecycle_state == 'RUNNING' and (do_action | default(false)) | bool
+
+    - name: Final status
+      ansible.builtin.debug:
+        msg: |
+          primary_up={{ primary_up }}
+          backup_state={{ backup_facts.instances[0].lifecycle_state | default('UNKNOWN') }}
