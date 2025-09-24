@@ -13,16 +13,11 @@
   tasks:
     - name: "Criar diretório OCI persistente"
       file:
-        path: "/runner/.oci"
+        path: /runner/.oci
         state: directory
         mode: '0700'
-
-    - name: "Criar diretório temporário do Ansible"
-      file:
-        path: "/runner/.ansible/tmp"
-        state: directory
-        mode: '0755'
-        recurse: yes
+        owner: 1000
+        group: 1000
 
     - name: "Recriar arquivo da chave OCI a partir de OCI_KEY_CONTENT"
       copy:
@@ -42,7 +37,7 @@
           region={{ lookup('env','OCI_REGION') }}
         mode: '0600'
 
-    - name: "Definir variável de ambiente OCI_CONFIG_FILE"
+    - name: "Set OCI_CONFIG_FILE environment"
       ansible.builtin.set_fact:
         OCI_CONFIG_FILE: /runner/.oci/config
 
@@ -67,8 +62,6 @@
         compartment_id: "{{ compartment_ocid }}"
       register: primary_facts
       when: not primary_up
-      environment:
-        OCI_CONFIG_FILE: "{{ OCI_CONFIG_FILE }}"
 
     - name: "Update primary_up from OCI facts if HTTP failed"
       ansible.builtin.set_fact:
@@ -80,8 +73,6 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: backup_facts
-      environment:
-        OCI_CONFIG_FILE: "{{ OCI_CONFIG_FILE }}"
 
     - name: "Decide action: start backup (if primary down && backup not RUNNING)"
       ansible.builtin.debug:
@@ -95,8 +86,6 @@
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
       when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING') and do_action | bool
-      environment:
-        OCI_CONFIG_FILE: "{{ OCI_CONFIG_FILE }}"
 
     - name: "Decide action: stop backup (if primary up && backup RUNNING)"
       ansible.builtin.debug:
@@ -110,8 +99,6 @@
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
       when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING') and do_action | bool
-      environment:
-        OCI_CONFIG_FILE: "{{ OCI_CONFIG_FILE }}"
 
     - name: "Final status"
       ansible.builtin.debug:
