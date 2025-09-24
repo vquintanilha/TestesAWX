@@ -1,8 +1,9 @@
 ---
-- name: "AWX -> check primary and manage backup instance"
+- name: AWX -> check primary and manage backup instance
   hosts: localhost
   connection: local
   gather_facts: no
+
   vars:
     primary_health_url: "http://168.75.97.255/ping"
     primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
@@ -12,6 +13,9 @@
     oci_config_file: "/tmp/oci/config"
     oci_key_file: "/tmp/oci/oci_api_key.pem"
 
+  environment:
+    OCI_CONFIG_FILE: "/tmp/oci/config"
+
   tasks:
     - name: "Criar diretório OCI persistente"
       ansible.builtin.file:
@@ -20,13 +24,13 @@
         mode: '0700'
 
     - name: "Recriar arquivo da chave OCI"
-      copy:
+      ansible.builtin.copy:
         dest: "{{ oci_key_file }}"
         content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
         mode: '0600'
 
     - name: "Criar arquivo de configuração OCI"
-      copy:
+      ansible.builtin.copy:
         dest: "{{ oci_config_file }}"
         mode: '0600'
         content: |
@@ -36,10 +40,6 @@
           tenancy={{ lookup('env','OCI_TENANCY') }}
           region={{ lookup('env','OCI_REGION') }}
           key_file={{ oci_key_file }}
-
-    - name: "Set OCI_CONFIG_FILE environment"
-      ansible.builtin.set_env:
-        OCI_CONFIG_FILE: "{{ oci_config_file }}"
 
     - name: "Check primary by HTTP (Traefik /ping)"
       ansible.builtin.uri:
@@ -57,7 +57,7 @@
         primary_up: "{{ (http_check.get('status', 0) == 200) }}"
 
     - name: "Check primary instance in OCI"
-      oracle.oci.oci_compute_instance_facts:
+      oracle.oci.compute_instance_facts:
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: primary_facts
@@ -69,7 +69,7 @@
       when: not primary_up and (primary_facts.instances is defined and primary_facts.instances | length > 0)
 
     - name: "Get backup instance facts (always)"
-      oracle.oci.oci_compute_instance_facts:
+      oracle.oci.compute_instance_facts:
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: backup_facts
@@ -80,7 +80,7 @@
       when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING')
 
     - name: "Start backup instance (OCI)"
-      oracle.oci.oci_compute_instance_actions:
+      oracle.oci.compute_instance_actions:
         action: start
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
@@ -93,7 +93,7 @@
       when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING')
 
     - name: "Stop backup instance (OCI)"
-      oracle.oci.oci_compute_instance_actions:
+      oracle.oci.compute_instance_actions:
         action: stop
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
