@@ -31,7 +31,7 @@
         primary_up: "{{ (http_check.status == 200) | default(false) }}"
 
     - name: "If HTTP failed - check primary instance in OCI"
-      oracle.oci.oci_compute_instance_facts:
+      oracle.oci.compute_instance:
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: primary_facts
@@ -43,7 +43,7 @@
       when: not primary_up
 
     - name: "Get backup instance facts"
-      oracle.oci.oci_compute_instance_facts:
+      oracle.oci.compute_instance:
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: backup_facts
