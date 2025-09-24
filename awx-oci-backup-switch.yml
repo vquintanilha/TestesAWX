@@ -8,8 +8,9 @@
     primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
     backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
-    do_action: true  # habilita a execução real de start/stop
+    do_action: true
     oci_config_path: "/runner/.oci/config"
+    oci_config_profile: "DEFAULT"
 
   tasks:
     - name: "Criar diretório OCI persistente"
@@ -57,7 +58,8 @@
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
-        config_file: "{{ oci_config_path }}"
+        config_file_location: "{{ oci_config_path }}"
+        config_profile_name: "{{ oci_config_profile }}"
       register: primary_facts
       when: not primary_up
 
@@ -70,7 +72,8 @@
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
-        config_file: "{{ oci_config_path }}"
+        config_file_location: "{{ oci_config_path }}"
+        config_profile_name: "{{ oci_config_profile }}"
       register: backup_facts
 
     - name: "Decide action: start backup (if primary down && backup not RUNNING)"
@@ -84,7 +87,8 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-        config_file: "{{ oci_config_path }}"
+        config_file_location: "{{ oci_config_path }}"
+        config_profile_name: "{{ oci_config_profile }}"
       when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING') and do_action | bool
 
     - name: "Decide action: stop backup (if primary up && backup RUNNING)"
@@ -98,7 +102,8 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-        config_file: "{{ oci_config_path }}"
+        config_file_location: "{{ oci_config_path }}"
+        config_profile_name: "{{ oci_config_profile }}"
       when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING') and do_action | bool
 
     - name: "Final status"
