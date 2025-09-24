@@ -3,45 +3,21 @@
   hosts: localhost
   connection: local
   gather_facts: no
-
   vars:
     primary_health_url: "http://168.75.97.255/ping"
     primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
     backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
-    do_action: true
-    oci_config_file: "/tmp/oci/config"
-    oci_key_file: "/tmp/oci/oci_api_key.pem"
-
-  environment:
-    OCI_CONFIG_FILE: "/tmp/oci/config"
+    do_action: true  # habilita a execução real de start/stop
 
   tasks:
-    - name: Criar diretório OCI persistente
-      ansible.builtin.file:
-        path: "/tmp/oci"
-        state: directory
-        mode: '0700'
-
-    - name: Recriar arquivo da chave OCI
-      ansible.builtin.copy:
-        dest: "{{ oci_key_file }}"
+    - name: "Recriar arquivo da chave OCI a partir de OCI_KEY_CONTENT"
+      copy:
+        dest: /tmp/oci_api_key.pem
         content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
         mode: '0600'
 
-    - name: Criar arquivo de configuração OCI
-      ansible.builtin.copy:
-        dest: "{{ oci_config_file }}"
-        mode: '0600'
-        content: |
-          [DEFAULT]
-          user={{ lookup('env','OCI_USER') }}
-          fingerprint={{ lookup('env','OCI_FINGERPRINT') }}
-          tenancy={{ lookup('env','OCI_TENANCY') }}
-          region={{ lookup('env','OCI_REGION') }}
-          key_file={{ oci_key_file }}
-
-    - name: Check primary by HTTP (Traefik /ping)
+    - name: "Check primary by HTTP (Traefik /ping)"
       ansible.builtin.uri:
         url: "{{ primary_health_url }}"
         method: GET
@@ -52,23 +28,24 @@
       failed_when: false
       check_mode: no
 
-    - name: Set primary_up from HTTP
+    - name: "Set primary_up from HTTP"
       ansible.builtin.set_fact:
         primary_up: "{{ (http_check.get('status', 0) == 200) }}"
 
-    - name: Check primary instance in OCI
+    - name: "Check primary instance in OCI"
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: primary_facts
+      # Sempre executa, mas só atualiza primary_up se HTTP falhou
       when: not primary_up
 
-    - name: Update primary_up from OCI facts if HTTP failed
+    - name: "Update primary_up from OCI facts if HTTP failed"
       ansible.builtin.set_fact:
         primary_up: "{{ (primary_facts.instances[0].lifecycle_state == 'RUNNING') | default(false) }}"
       when: not primary_up and (primary_facts.instances is defined and primary_facts.instances | length > 0)
 
-    - name: Get backup instance facts (always)
+    - name: "Get backup instance facts (always)"
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
@@ -100,7 +77,7 @@
         wait: yes
       when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING') and do_action | bool
 
-    - name: Final status
+    - name: "Final status"
       ansible.builtin.debug:
         msg: |
           primary_up={{ primary_up }}
