@@ -8,15 +8,15 @@
     primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
     backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
-    do_action: true  # habilita a execução real de start/stop
+    do_action: true
 
   tasks:
     - name: "Criar diretório OCI persistente"
       file:
         path: /runner/.oci
         state: directory
-        owner: 1000
-        group: 1000
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_gid }}"
         mode: '0700'
 
     - name: "Recriar arquivo da chave OCI"
