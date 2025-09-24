@@ -32,19 +32,20 @@
       ansible.builtin.set_fact:
         primary_up: "{{ (http_check.get('status', 0) == 200) }}"
 
-    - name: "If HTTP failed - check primary instance in OCI"
+    - name: "Check primary instance in OCI"
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: primary_facts
+      # Sempre executa, mas só atualiza primary_up se HTTP falhou
       when: not primary_up
 
-    - name: "Set primary_up from OCI facts"
+    - name: "Update primary_up from OCI facts if HTTP failed"
       ansible.builtin.set_fact:
         primary_up: "{{ (primary_facts.instances[0].lifecycle_state == 'RUNNING') | default(false) }}"
-      when: not primary_up
+      when: not primary_up and (primary_facts.instances is defined and primary_facts.instances | length > 0)
 
-    - name: "Get backup instance facts"
+    - name: "Get backup instance facts (always)"
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
@@ -53,7 +54,7 @@
     - name: "Decide action: start backup (if primary down && backup not RUNNING)"
       ansible.builtin.debug:
         msg: "Would START backup instance {{ backup_instance_ocid }} (primary_up={{ primary_up }})"
-      when: not primary_up and backup_facts.instances[0].lifecycle_state != 'RUNNING'
+      when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING')
 
     - name: "Start backup instance (OCI)"
       oracle.oci.oci_compute_instance_actions:
@@ -61,12 +62,12 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-      when: not primary_up and backup_facts.instances[0].lifecycle_state != 'RUNNING' and do_action | bool
+      when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING') and do_action | bool
 
     - name: "Decide action: stop backup (if primary up && backup RUNNING)"
       ansible.builtin.debug:
         msg: "Would STOP backup instance {{ backup_instance_ocid }} (primary_up={{ primary_up }})"
-      when: primary_up and backup_facts.instances[0].lifecycle_state == 'RUNNING'
+      when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING')
 
     - name: "Stop backup instance (OCI)"
       oracle.oci.oci_compute_instance_actions:
@@ -74,7 +75,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-      when: primary_up and backup_facts.instances[0].lifecycle_state == 'RUNNING' and do_action | bool
+      when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING') and do_action | bool
 
     - name: "Final status"
       ansible.builtin.debug:
