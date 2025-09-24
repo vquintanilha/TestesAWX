@@ -103,6 +103,6 @@
 
     - name: Final status
       ansible.builtin.debug:
-        msg: |
-          primary_up={{ primary_up }}
-          backup_state={{ backup_facts.instances[0].lifecycle_state | default('UNKNOWN') }}
+        msg:
+          - "primary_up={{ primary_up }}"
+          - "backup_state={{ backup_facts.instances[0].lifecycle_state | default('UNKNOWN') }}"
