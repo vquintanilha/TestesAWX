@@ -17,6 +17,23 @@
         content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
         mode: '0600'
 
+    - name: "Criar arquivo de configuração OCI"
+      copy:
+        dest: /tmp/oci_config
+        content: |
+          [DEFAULT]
+          user={{ lookup('env','OCI_USER') }}
+          fingerprint={{ lookup('env','OCI_FINGERPRINT') }}
+          key_file=/tmp/oci_api_key.pem
+          tenancy={{ lookup('env','OCI_TENANCY') }}
+          region={{ lookup('env','OCI_REGION') }}
+        mode: '0600'
+
+    - name: "Set OCI_CONFIG_FILE environment"
+      ansible.builtin.set_fact:
+        oci_env:
+          OCI_CONFIG_FILE: "/tmp/oci_config"
+
     - name: "Check primary by HTTP (Traefik /ping)"
       ansible.builtin.uri:
         url: "{{ primary_health_url }}"
@@ -37,7 +54,7 @@
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: primary_facts
-      # Sempre executa, mas só atualiza primary_up se HTTP falhou
+      environment: "{{ oci_env }}"
       when: not primary_up
 
     - name: "Update primary_up from OCI facts if HTTP failed"
@@ -50,6 +67,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
       register: backup_facts
+      environment: "{{ oci_env }}"
 
     - name: "Decide action: start backup (if primary down && backup not RUNNING)"
       ansible.builtin.debug:
@@ -63,6 +81,7 @@
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
       when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING') and do_action | bool
+      environment: "{{ oci_env }}"
 
     - name: "Decide action: stop backup (if primary up && backup RUNNING)"
       ansible.builtin.debug:
@@ -76,6 +95,7 @@
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
       when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING') and do_action | bool
+      environment: "{{ oci_env }}"
 
     - name: "Final status"
       ansible.builtin.debug:
