@@ -8,6 +8,7 @@
     primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
     backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
+    do_action: true  # habilita a execução real de start/stop
 
   tasks:
     - name: "Recriar arquivo da chave OCI a partir de OCI_KEY_CONTENT"
@@ -60,7 +61,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-      when: not primary_up and backup_facts.instances[0].lifecycle_state != 'RUNNING' and (do_action | default(false)) | bool
+      when: not primary_up and backup_facts.instances[0].lifecycle_state != 'RUNNING' and do_action | bool
 
     - name: "Decide action: stop backup (if primary up && backup RUNNING)"
       ansible.builtin.debug:
@@ -73,7 +74,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-      when: primary_up and backup_facts.instances[0].lifecycle_state == 'RUNNING' and (do_action | default(false)) | bool
+      when: primary_up and backup_facts.instances[0].lifecycle_state == 'RUNNING' and do_action | bool
 
     - name: "Final status"
       ansible.builtin.debug:
