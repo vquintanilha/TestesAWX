@@ -11,20 +11,28 @@
     do_action: true  # habilita a execução real de start/stop
 
   tasks:
-    - name: "Recriar arquivo da chave OCI a partir de OCI_KEY_CONTENT"
+    - name: "Criar diretório OCI persistente"
+      file:
+        path: /runner/.oci
+        state: directory
+        owner: 1000
+        group: 1000
+        mode: '0700'
+
+    - name: "Recriar arquivo da chave OCI"
       copy:
-        dest: /tmp/oci_api_key.pem
+        dest: /runner/.oci/oci_api_key.pem
         content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
         mode: '0600'
 
     - name: "Criar arquivo de configuração OCI"
       copy:
-        dest: /tmp/oci_config
+        dest: /runner/.oci/config
         content: |
           [DEFAULT]
           user={{ lookup('env','OCI_USER') }}
           fingerprint={{ lookup('env','OCI_FINGERPRINT') }}
-          key_file=/tmp/oci_api_key.pem
+          key_file=/runner/.oci/oci_api_key.pem
           tenancy={{ lookup('env','OCI_TENANCY') }}
           region={{ lookup('env','OCI_REGION') }}
         mode: '0600'
@@ -32,7 +40,7 @@
     - name: "Set OCI_CONFIG_FILE environment"
       ansible.builtin.set_fact:
         oci_env:
-          OCI_CONFIG_FILE: "/tmp/oci_config"
+          OCI_CONFIG_FILE: "/runner/.oci/config"
 
     - name: "Check primary by HTTP (Traefik /ping)"
       ansible.builtin.uri:
@@ -43,7 +51,6 @@
         timeout: 5
       register: http_check
       failed_when: false
-      check_mode: no
 
     - name: "Set primary_up from HTTP"
       ansible.builtin.set_fact:
