@@ -3,15 +3,12 @@
   hosts: localhost
   connection: local
   gather_facts: no
+  any_errors_fatal: true
   tasks:
     - name: Verificar se manage_backup.sh existe
       ansible.builtin.stat:
         path: "{{ playbook_dir }}/scripts/manage_backup.sh"
       register: script_file
-
-    - name: Debug do retorno do stat
-      ansible.builtin.debug:
-        var: script_file
 
     - name: Falhar se o script não existir
       ansible.builtin.fail:
@@ -28,4 +25,3 @@
     - name: Mostrar saída do script
       ansible.builtin.debug:
         var: script_output
-      when: script_file.stat.exists
