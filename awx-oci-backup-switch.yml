@@ -12,10 +12,10 @@
     - name: Falhar se o script não existir
       ansible.builtin.fail:
         msg: "Script manage_backup.sh não encontrado em {{ playbook_dir }}/scripts/"
-      when: not script_file.stat.exists
+      when: not script_file.stat.exists | default(false)
 
     - name: Executar manage_backup.sh
       ansible.builtin.shell: ./manage_backup.sh
       args:
         chdir: "{{ playbook_dir }}/scripts"
-      when: script_file.stat.exists
+      when: script_file.stat.exists | default(false)
