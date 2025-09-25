@@ -4,7 +4,7 @@
   connection: local
   gather_facts: no
   tasks:
-    - name: Execute script manage_backup.sh
-      ansible.builtin.shell: ./scripts/manage_backup.sh
+    - name: Execute manage_backup.sh
+      ansible.builtin.shell: ./manage_backup.sh
       args:
-        chdir: "{{ playbook_dir }}"
+        chdir: "{{ playbook_dir }}/scripts"
