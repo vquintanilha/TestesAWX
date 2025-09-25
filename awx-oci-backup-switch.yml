@@ -18,17 +18,23 @@
         path: /runner/.oci
         state: directory
         mode: '0700'
+        owner: 1000
+        group: 1000
 
     - name: "Recriar chave OCI a partir do conteúdo"
       copy:
         dest: /runner/.oci/oci_api_key.pem
         content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
         mode: '0600'
+        owner: 1000
+        group: 1000
 
     - name: "Gerar arquivo de configuração OCI"
       copy:
         dest: "{{ oci_config_file }}"
         mode: '0600'
+        owner: 1000
+        group: 1000
         content: |
           [DEFAULT]
           user={{ lookup('env','OCI_USER') }}
