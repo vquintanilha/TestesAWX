@@ -4,6 +4,13 @@
   connection: local
   gather_facts: no
   any_errors_fatal: true
+  vars:
+    primary_health_url: "http://168.75.97.255/ping"
+    primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
+    backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
+    compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
+    oci_config_file: "/runner/.oci/config"
+
   tasks:
     - name: Verificar se manage_backup.sh existe
       ansible.builtin.stat:
@@ -21,6 +28,15 @@
         chdir: "{{ playbook_dir }}/scripts"
       register: script_output
       when: script_file.stat.exists
+      environment:
+        PRIMARY_INSTANCE_OCID: "{{ primary_instance_ocid }}"
+        BACKUP_INSTANCE_OCID: "{{ backup_instance_ocid }}"
+        COMPARTMENT_OCID: "{{ compartment_ocid }}"
+        OCI_USER: "{{ lookup('env','OCI_USER') }}"
+        OCI_TENANCY: "{{ lookup('env','OCI_TENANCY') }}"
+        OCI_FINGERPRINT: "{{ lookup('env','OCI_FINGERPRINT') }}"
+        OCI_REGION: "{{ lookup('env','OCI_REGION') }}"
+        OCI_KEY_CONTENT: "{{ lookup('env','OCI_KEY_CONTENT') }}"
 
     - name: Mostrar saída do script
       ansible.builtin.debug:
