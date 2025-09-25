@@ -1,23 +1,10 @@
 ---
-- name: Run backup management script
+- name: Run manage_backup.sh
   hosts: localhost
   connection: local
   gather_facts: no
-
-  vars:
-    script_path: "./scripts/manage_backup.sh"
-
   tasks:
-    - name: Ensure script is executable
-      ansible.builtin.file:
-        path: "{{ script_path }}"
-        mode: '0755'
-
-    - name: Run backup management script
-      ansible.builtin.shell: "{{ script_path }}"
-      register: script_output
-      ignore_errors: no
-
-    - name: Show script output
-      ansible.builtin.debug:
-        var: script_output.stdout
+    - name: Execute script manage_backup.sh
+      ansible.builtin.shell: ./scripts/manage_backup.sh
+      args:
+        chdir: "{{ playbook_dir }}"
