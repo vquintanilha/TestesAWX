@@ -7,7 +7,7 @@
   tasks:
     - name: Execute backup management shell script
       ansible.builtin.command:
-        cmd: /runner/scripts/manage_backup.sh
+        cmd: /runner/project/scripts/manage_backup.sh
       environment:
         OCI_USER: "{{ lookup('env','OCI_USER') }}"
         OCI_TENANCY: "{{ lookup('env','OCI_TENANCY') }}"
