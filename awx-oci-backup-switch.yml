@@ -9,7 +9,6 @@
     primary_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacxy36xnwqqnm3ccy2rmwy4f4cqtbubsoawfz3flsqqd7a"
     backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
-    oci_config_file: "/runner/.oci/config"
 
   tasks:
     - name: Verificar se manage_backup.sh existe
@@ -27,7 +26,6 @@
       args:
         chdir: "{{ playbook_dir }}/scripts"
       register: script_output
-      when: script_file.stat.exists
       environment:
         PRIMARY_INSTANCE_OCID: "{{ primary_instance_ocid }}"
         BACKUP_INSTANCE_OCID: "{{ backup_instance_ocid }}"
@@ -37,7 +35,7 @@
         OCI_FINGERPRINT: "{{ lookup('env','OCI_FINGERPRINT') }}"
         OCI_REGION: "{{ lookup('env','OCI_REGION') }}"
         OCI_KEY_CONTENT: "{{ lookup('env','OCI_KEY_CONTENT') }}"
-        OCI_KEY_FILE: "/runner/.oci/oci_api_key.pem"
+        OCI_KEY_FILE: "/runner/.oci/oci_api_key.pem"       # <<< necessário para o script
         OCI_CONFIG_FILE: "/runner/.oci/config"
 
     - name: Mostrar saída do script
