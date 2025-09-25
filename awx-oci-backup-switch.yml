@@ -9,43 +9,33 @@
     backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
     do_action: true  # habilita a execução real de start/stop
-    oci_config_path: "/runner/.oci/config"
+    oci_config_file: "/runner/.oci/config"
 
   tasks:
 
-    - name: "Criar diretório OCI persistente"
+    - name: "Garantir diretório .oci existe"
       file:
-        path: "/runner/.oci"
+        path: /runner/.oci
         state: directory
-        owner: 1000
-        group: 1000
         mode: '0700'
 
-    - name: "Recriar arquivo da chave OCI a partir de OCI_KEY_CONTENT"
+    - name: "Recriar chave OCI a partir do conteúdo"
       copy:
-        dest: "/runner/.oci/oci_api_key.pem"
+        dest: /runner/.oci/oci_api_key.pem
         content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
-        owner: 1000
-        group: 1000
         mode: '0600'
 
-    - name: "Criar arquivo de configuração OCI"
+    - name: "Gerar arquivo de configuração OCI"
       copy:
-        dest: "{{ oci_config_path }}"
+        dest: /runner/.oci/config
+        mode: '0600'
         content: |
           [DEFAULT]
           user={{ lookup('env','OCI_USER') }}
           fingerprint={{ lookup('env','OCI_FINGERPRINT') }}
-          key_file=/runner/.oci/oci_api_key.pem
           tenancy={{ lookup('env','OCI_TENANCY') }}
           region={{ lookup('env','OCI_REGION') }}
-        owner: 1000
-        group: 1000
-        mode: '0600'
-
-    - name: "Set OCI_CONFIG_FILE environment variable"
-      ansible.builtin.set_fact:
-        oci_config_file: "{{ oci_config_path }}"
+          key_file=/runner/.oci/oci_api_key.pem
 
     - name: "Check primary by HTTP (Traefik /ping)"
       ansible.builtin.uri:
@@ -66,7 +56,7 @@
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
-        config_file_location: "{{ oci_config_file }}"
+        config_file: "{{ oci_config_file }}"
       register: primary_facts
       when: not primary_up
 
@@ -79,7 +69,7 @@
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
-        config_file_location: "{{ oci_config_file }}"
+        config_file: "{{ oci_config_file }}"
       register: backup_facts
 
     - name: "Decide action: start backup (if primary down && backup not RUNNING)"
@@ -93,7 +83,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-        config_file_location: "{{ oci_config_file }}"
+        config_file: "{{ oci_config_file }}"
       when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING') and do_action | bool
 
     - name: "Decide action: stop backup (if primary up && backup RUNNING)"
@@ -107,7 +97,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-        config_file_location: "{{ oci_config_file }}"
+        config_file: "{{ oci_config_file }}"
       when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING') and do_action | bool
 
     - name: "Final status"
