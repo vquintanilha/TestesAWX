@@ -9,7 +9,7 @@
     backup_instance_ocid: "ocid1.instance.oc1.sa-saopaulo-1.antxeljrvwmiupacabescfqjrjrh57q4qzjve73zwfd3wtslubn42tpehzra"
     compartment_ocid: "ocid1.compartment.oc1..aaaaaaaacmy5ewx46xgaycneb7cn2csagoykbm6gnayaea3zk34b4vz5ajvq"
     do_action: true  # habilita a execução real de start/stop
-    oci_key_file: "/runner/.oci/oci_api_key.pem"
+    oci_config_file: "/runner/.oci/config"
 
   tasks:
 
@@ -21,9 +21,21 @@
 
     - name: "Recriar chave OCI a partir do conteúdo"
       copy:
-        dest: "{{ oci_key_file }}"
+        dest: /runner/.oci/oci_api_key.pem
         content: "{{ lookup('env','OCI_KEY_CONTENT') }}"
         mode: '0600'
+
+    - name: "Gerar arquivo de configuração OCI"
+      copy:
+        dest: "{{ oci_config_file }}"
+        mode: '0600'
+        content: |
+          [DEFAULT]
+          user={{ lookup('env','OCI_USER') }}
+          fingerprint={{ lookup('env','OCI_FINGERPRINT') }}
+          tenancy={{ lookup('env','OCI_TENANCY') }}
+          region={{ lookup('env','OCI_REGION') }}
+          key_file=/runner/.oci/oci_api_key.pem
 
     - name: "Check primary by HTTP (Traefik /ping)"
       ansible.builtin.uri:
@@ -44,11 +56,7 @@
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ primary_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
-        api_user: "{{ lookup('env','OCI_USER') }}"
-        api_user_fingerprint: "{{ lookup('env','OCI_FINGERPRINT') }}"
-        api_user_key_file: "{{ oci_key_file }}"
-        tenancy: "{{ lookup('env','OCI_TENANCY') }}"
-        region: "{{ lookup('env','OCI_REGION') }}"
+        config_file_location: "{{ oci_config_file }}"
       register: primary_facts
       when: not primary_up
 
@@ -61,11 +69,7 @@
       oracle.oci.oci_compute_instance_facts:
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
-        api_user: "{{ lookup('env','OCI_USER') }}"
-        api_user_fingerprint: "{{ lookup('env','OCI_FINGERPRINT') }}"
-        api_user_key_file: "{{ oci_key_file }}"
-        tenancy: "{{ lookup('env','OCI_TENANCY') }}"
-        region: "{{ lookup('env','OCI_REGION') }}"
+        config_file_location: "{{ oci_config_file }}"
       register: backup_facts
 
     - name: "Decide action: start backup (if primary down && backup not RUNNING)"
@@ -79,11 +83,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-        api_user: "{{ lookup('env','OCI_USER') }}"
-        api_user_fingerprint: "{{ lookup('env','OCI_FINGERPRINT') }}"
-        api_user_key_file: "{{ oci_key_file }}"
-        tenancy: "{{ lookup('env','OCI_TENANCY') }}"
-        region: "{{ lookup('env','OCI_REGION') }}"
+        config_file_location: "{{ oci_config_file }}"
       when: not primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') != 'RUNNING') and do_action | bool
 
     - name: "Decide action: stop backup (if primary up && backup RUNNING)"
@@ -97,11 +97,7 @@
         instance_id: "{{ backup_instance_ocid }}"
         compartment_id: "{{ compartment_ocid }}"
         wait: yes
-        api_user: "{{ lookup('env','OCI_USER') }}"
-        api_user_fingerprint: "{{ lookup('env','OCI_FINGERPRINT') }}"
-        api_user_key_file: "{{ oci_key_file }}"
-        tenancy: "{{ lookup('env','OCI_TENANCY') }}"
-        region: "{{ lookup('env','OCI_REGION') }}"
+        config_file_location: "{{ oci_config_file }}"
       when: primary_up and (backup_facts.instances[0].lifecycle_state | default('UNKNOWN') == 'RUNNING') and do_action | bool
 
     - name: "Final status"
