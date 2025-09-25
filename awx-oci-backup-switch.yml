@@ -9,19 +9,23 @@
         path: "{{ playbook_dir }}/scripts/manage_backup.sh"
       register: script_file
 
+    - name: Debug do retorno do stat
+      ansible.builtin.debug:
+        var: script_file
+
     - name: Falhar se o script não existir
       ansible.builtin.fail:
         msg: "Script manage_backup.sh não encontrado em {{ playbook_dir }}/scripts/"
-      when: not (script_file.stat.exists | default(false) | bool)
+      when: not script_file.stat.exists
 
     - name: Executar manage_backup.sh
       ansible.builtin.shell: ./manage_backup.sh
       args:
         chdir: "{{ playbook_dir }}/scripts"
       register: script_output
-      when: (script_file.stat.exists | default(false) | bool)
+      when: script_file.stat.exists
 
     - name: Mostrar saída do script
       ansible.builtin.debug:
-        var: script_output.stdout_lines
-      when: script_output is defined
+        var: script_output
+      when: script_file.stat.exists
