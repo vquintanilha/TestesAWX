@@ -4,7 +4,18 @@
   connection: local
   gather_facts: no
   tasks:
-    - name: Execute manage_backup.sh
-      ansible.builtin.shell: ./manage-backup.sh
+    - name: Verificar se manage_backup.sh existe
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/scripts/manage_backup.sh"
+      register: script_file
+
+    - name: Falhar se o script não existir
+      ansible.builtin.fail:
+        msg: "Script manage_backup.sh não encontrado em {{ playbook_dir }}/scripts/"
+      when: not script_file.stat.exists
+
+    - name: Executar manage_backup.sh
+      ansible.builtin.shell: ./manage_backup.sh
       args:
         chdir: "{{ playbook_dir }}/scripts"
+      when: script_file.stat.exists
