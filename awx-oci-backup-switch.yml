@@ -1,15 +1,21 @@
-- name: Run backup script
+---
+- name: Run OCI backup management script
   hosts: localhost
+  connection: local
   gather_facts: no
+  vars:
+    script_path: "./scripts/manage_backup.sh"
+
   tasks:
-    - name: Ensure script is executable
+
+    - name: Ensure the backup script is executable
       ansible.builtin.file:
-        path: /runner/project/scripts/manage_backup.sh
+        path: "{{ script_path }}"
         mode: '0755'
 
-    - name: Execute backup script
+    - name: Execute backup script with OCI credentials
       ansible.builtin.command:
-        cmd: /runner/project/scripts/manage_backup.sh
+        cmd: "{{ script_path }}"
       environment:
         OCI_USER: "{{ lookup('env','OCI_USER') }}"
         OCI_TENANCY: "{{ lookup('env','OCI_TENANCY') }}"
