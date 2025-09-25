@@ -37,6 +37,8 @@
         OCI_FINGERPRINT: "{{ lookup('env','OCI_FINGERPRINT') }}"
         OCI_REGION: "{{ lookup('env','OCI_REGION') }}"
         OCI_KEY_CONTENT: "{{ lookup('env','OCI_KEY_CONTENT') }}"
+        OCI_KEY_FILE: "/runner/.oci/oci_api_key.pem"
+        OCI_CONFIG_FILE: "/runner/.oci/config"
 
     - name: Mostrar saída do script
       ansible.builtin.debug:
