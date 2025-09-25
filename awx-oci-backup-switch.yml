@@ -3,12 +3,14 @@
   hosts: localhost
   connection: local
   gather_facts: no
+
   tasks:
-    - name: Execute shell script
-      ansible.builtin.command: /scripts/manage_backup.sh
+    - name: Execute backup management shell script
+      ansible.builtin.command:
+        cmd: /runner/scripts/manage_backup.sh
       environment:
         OCI_USER: "{{ lookup('env','OCI_USER') }}"
-        OCI_KEY_CONTENT: "{{ lookup('env','OCI_KEY_CONTENT') }}"
         OCI_TENANCY: "{{ lookup('env','OCI_TENANCY') }}"
-        OCI_REGION: "{{ lookup('env','OCI_REGION') }}"
         OCI_FINGERPRINT: "{{ lookup('env','OCI_FINGERPRINT') }}"
+        OCI_REGION: "{{ lookup('env','OCI_REGION') }}"
+        OCI_KEY_CONTENT: "{{ lookup('env','OCI_KEY_CONTENT') }}"
