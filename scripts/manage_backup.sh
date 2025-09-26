@@ -68,7 +68,7 @@ chmod 600 "$OCI_CONFIG_FILE"
 
 # Cria arquivo de chave se não existir
 if [ ! -f "$OCI_KEY_FILE" ]; then
-    echo "${OCI_KEY_CONTENT:?Need to set OCI_KEY_CONTENT}" > "$OCI_KEY_FILE"
+    echo "${OCI_KEY_CONTENT:?Need to set OCI_KEY_CONTENT}" | base64 -d > "$OCI_KEY_FILE"
     chmod 600 "$OCI_KEY_FILE"
 fi
 
