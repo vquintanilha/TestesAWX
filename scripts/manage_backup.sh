@@ -2,15 +2,17 @@
 set -euo pipefail
 
 # ===============================
-# CONFIGURAÇÃO
+# CONFIGURAÇÃO - variáveis de ambiente obrigatórias
 # ===============================
 PRIMARY_HEALTH_URL="${PRIMARY_HEALTH_URL:-http://168.75.97.255/ping}"
 PRIMARY_INSTANCE_OCID="${PRIMARY_INSTANCE_OCID:?Need to set PRIMARY_INSTANCE_OCID}"
 BACKUP_INSTANCE_OCID="${BACKUP_INSTANCE_OCID:?Need to set BACKUP_INSTANCE_OCID}"
 COMPARTMENT_OCID="${COMPARTMENT_OCID:?Need to set COMPARTMENT_OCID}"
 DO_ACTION="${DO_ACTION:-true}"
+
+# Tentativas de healthcheck HTTP
 PING_RETRIES="${PING_RETRIES:-3}"
-PING_DELAY="${PING_DELAY:-5}"
+PING_DELAY="${PING_DELAY:-3}"  # segundos entre tentativas
 
 # ===============================
 # FUNÇÕES AUXILIARES
@@ -19,7 +21,7 @@ PING_DELAY="${PING_DELAY:-5}"
 function check_http_primary() {
     local success_count=0
     for ((i=1; i<=PING_RETRIES; i++)); do
-        echo "→ Tentativa $i de $PING_RETRIES: verificando $PRIMARY_HEALTH_URL..."
+        echo "→ Tentativa $i de $PING_RETRIES: verificando $PRIMARY_HEALTH_URL..." >&2
         if curl -sf -o /dev/null "$PRIMARY_HEALTH_URL"; then
             ((success_count++))
         fi
@@ -45,7 +47,7 @@ function get_instance_state() {
 function start_instance() {
     local instance_id="$1"
     if [ "$DO_ACTION" = true ]; then
-        echo "🚀 Starting instance $instance_id..."
+        echo "🚀 Iniciando instância $instance_id..."
         oci compute instance action \
             --instance-id "$instance_id" \
             --action START \
@@ -59,7 +61,7 @@ function start_instance() {
 function stop_instance() {
     local instance_id="$1"
     if [ "$DO_ACTION" = true ]; then
-        echo "🛑 Stopping instance $instance_id..."
+        echo "🛑 Parando instância $instance_id..."
         oci compute instance action \
             --instance-id "$instance_id" \
             --action STOP \
@@ -71,7 +73,7 @@ function stop_instance() {
 }
 
 # ===============================
-# CONFIGURAÇÃO OCI
+# CRIAÇÃO DE CONFIGURAÇÃO OCI AUTOMÁTICA
 # ===============================
 
 mkdir -p "$(dirname "$OCI_CONFIG_FILE")"
@@ -81,10 +83,11 @@ user=${OCI_USER:?Need to set OCI_USER}
 fingerprint=${OCI_FINGERPRINT:?Need to set OCI_FINGERPRINT}
 tenancy=${OCI_TENANCY:?Need to set OCI_TENANCY}
 region=${OCI_REGION:?Need to set OCI_REGION}
-key_file=${OCI_KEY_FILE:?Need to set OCI_KEY_FILE}
+key_file=${OCI_KEY_FILE:?Need to set OCI_KEY_CONTENT in OCI_KEY_FILE}
 EOF
 chmod 600 "$OCI_CONFIG_FILE"
 
+# Cria arquivo de chave se não existir
 if [ ! -f "$OCI_KEY_FILE" ]; then
     echo "${OCI_KEY_CONTENT:?Need to set OCI_KEY_CONTENT}" | base64 -d > "$OCI_KEY_FILE"
     chmod 600 "$OCI_KEY_FILE"
@@ -95,33 +98,32 @@ fi
 # ===============================
 
 echo "==> Checando health da instância primária via HTTP (${PING_RETRIES} tentativas)..."
-PRIMARY_UP=$(check_http_primary)
-echo "Primary HTTP status: $PRIMARY_UP"
+PRIMARY_HTTP_OK=$(check_http_primary)
+echo "Primary HTTP status: $PRIMARY_HTTP_OK"
 
-# Verifica estado OCI (pra logs e fallback)
 PRIMARY_STATE=$(get_instance_state "$PRIMARY_INSTANCE_OCID")
 echo "Primary OCI state: $PRIMARY_STATE"
 
-# Checa estado do backup
 BACKUP_STATE=$(get_instance_state "$BACKUP_INSTANCE_OCID")
 echo "Backup OCI state: $BACKUP_STATE"
 
 # ===============================
-# DECISÃO DE AÇÕES
+# DECISÃO DE AÇÃO
 # ===============================
 
-if [ "$PRIMARY_UP" = false ]; then
-    echo "❗ Primary health check failed (${PING_RETRIES}x)."
+if [ "$PRIMARY_HTTP_OK" = "false" ]; then
+    echo "⚠️  Primary HTTP falhou!"
     if [ "$BACKUP_STATE" != "RUNNING" ]; then
-        echo "Backup está parado — iniciando failover..."
+        echo "➡️  Subindo instância de backup..."
         start_instance "$BACKUP_INSTANCE_OCID"
     else
-        echo "Backup já está em execução — mantendo online."
+        echo "Backup já está rodando — nenhuma ação necessária."
     fi
 else
     echo "✅ Primary health OK."
+    # Só derruba o backup se o HTTP estiver OK
     if [ "$BACKUP_STATE" = "RUNNING" ]; then
-        echo "Backup está rodando, mas primário respondeu HTTP — desligando backup..."
+        echo "➡️  Desligando instância de backup..."
         stop_instance "$BACKUP_INSTANCE_OCID"
     else
         echo "Backup já está parado — nada a fazer."
@@ -129,6 +131,6 @@ else
 fi
 
 echo "==> Status final:"
-echo "Primary (HTTP) = $PRIMARY_UP"
+echo "Primary (HTTP) = $PRIMARY_HTTP_OK"
 echo "Primary (OCI)  = $PRIMARY_STATE"
-echo "Backup (OCI)   = $(get_instance_state "$BACKUP_INSTANCE_OCID")"
+echo "Backup (OCI)   = $BACKUP_STATE"
